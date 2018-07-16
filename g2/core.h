@@ -17,9 +17,12 @@ namespace g2 {
 
 	enum class g2_socket_state : uint8_t {
 		NONE,
+		
 		ACCEPT,
 		CONNECTING,
 		CONNECTED,
+
+		WINDSEER,
 	};
 
 	struct subheader {
@@ -46,22 +49,33 @@ namespace g2 {
 		//uint16_t sid;
 		//uint16_t rid;
 		//uint16_t seqid;
-	};
+	} G1_PACKED;
 
 	struct socket {//: public gxx::io::ostream, public gxx::io::istorage {
 		dlist_head socklnk;
 		uint16_t sockid;
 
-		uint8_t  tgtid;
 		uint8_t* raddr_ptr;
 		size_t   raddr_len; 
-		gxx::dlist<g1::packet, &g1::packet::lnk> unreaded;
+		
+		//gxx::dlist<g1::packet, &g1::packet::lnk> unreaded;
 
 		//char * creadbf;
 		//size_t creadsz;
 
-		uint16_t sendid;
-		uint16_t readid;
+		union {
+			//linked
+			struct {
+				uint16_t sendseq;
+				uint16_t readseq;
+				dlist_head unreaded;
+			};
+
+			//accepter
+			struct {
+
+			};
+		};
 
 		g2_socket_state status;
 
