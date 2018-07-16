@@ -12,7 +12,9 @@ int main() {
 
 	g1::incoming_handler = g1_incoming;
 
-	g2::socket_ref socket = g2::create_socket(4000);
+	//g2::socket_ref socket = g2::create_socket(4000);
+
+	//auto serv = g2::create_server(10);
 
 	//g1::send("", 0, "Mirmik", 6);
 
