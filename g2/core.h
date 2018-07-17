@@ -27,57 +27,45 @@ namespace g2 {
 
 	struct subheader {
 		g2_frame_type type;
-		//uint16_t recvserv;
 		
-		uint8_t sendsock;
-		uint8_t recvsock;
+		uint8_t sendport;
+		uint8_t recvport;
 			
 		union {
-			//фрейм connect
-			struct {};
-
-			//connect answer
-			struct {
-				uint8_t dyn_recvsock;
+			struct {///< CONNECT
 			};
 
-			struct {
+			struct {///< CONNECT_ANSWER
+				uint8_t dyn_recvport;
+			};
+
+			struct {///< DATA
 				uint8_t datasize;
 				char data[0];
 			};
 		};
-		//uint16_t sid;
-		//uint16_t rid;
-		//uint16_t seqid;
 	} G1_PACKED;
 
-	struct socket {//: public gxx::io::ostream, public gxx::io::istorage {
+	struct socket {
 		dlist_head socklnk;
 		uint16_t sockid;
 
 		uint8_t* raddr_ptr;
 		size_t   raddr_len; 
-		
-		//gxx::dlist<g1::packet, &g1::packet::lnk> unreaded;
-
-		//char * creadbf;
-		//size_t creadsz;
 
 		union {
-			//linked
-			struct {
+			struct { ///< linked
 				uint16_t sendseq;
 				uint16_t readseq;
 				dlist_head unreaded;
 			};
 
-			//accepter
-			struct {
-
+			struct { ///< accepter
+				void (*accepthandler) (socket*);
 			};
 		};
 
-		g2_socket_state status;
+		g2_socket_state state = g2_socket_state::NONE;
 
 		//void send(char* data, size_t size);
 

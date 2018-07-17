@@ -23,5 +23,5 @@ g2::socket_ref g2::create_socket() {
 }*/
 
 void g2::incoming(g1::packet* pack) {
-		
+	g2::subheader* sh = (g2::subheader*) pack->dataptr();
 }
