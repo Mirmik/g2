@@ -13,12 +13,13 @@ namespace g2 {
 		CONNECT,
 		CONNECT_ANSWER,
 		DATA,
+		NACK,
 	};
 
 	enum class g2_socket_state : uint8_t {
 		NONE,
 		
-		ACCEPT,
+		ACCEPTER,
 		CONNECTING,
 		CONNECTED,
 
@@ -46,7 +47,7 @@ namespace g2 {
 		};
 	} G1_PACKED;
 
-	struct socket {
+	/*struct socket {
 		dlist_head socklnk;
 		uint16_t sockid;
 
@@ -58,12 +59,15 @@ namespace g2 {
 				uint16_t sendseq;
 				uint16_t readseq;
 				dlist_head unreaded;
+				void* argdatahandler;
+				void (*newdatahandler) (void*);
 			};
 
 			struct { ///< accepter
 				void (*accepthandler) (socket*);
 			};
 		};
+			
 
 		g2_socket_state state = g2_socket_state::NONE;
 
@@ -80,7 +84,13 @@ namespace g2 {
 		}
 
 		void send_connect(uint8_t* addr, size_t alen, int servid); 
-	};
+	};*/
+
+	class port {
+		dlist_head lnk;
+		uint16_t portid;
+		virtual incoming(g1::packet* pack);
+	}
 
 	/*struct server {
 		dlist_head servlnk;
@@ -120,6 +130,9 @@ namespace g2 {
 	//server_ref create_server(int port);
 
 	uint16_t get_dynamic_id();
+	socket* get_socket(uint16_t port);
+
+	void send_nack(g1::packet* pack);
 };
 
 #endif

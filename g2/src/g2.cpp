@@ -22,6 +22,36 @@ g2::socket_ref g2::create_socket() {
 
 }*/
 
+g2::socket* g2::get_socket(uint16_t port) {
+	return nullptr;
+}
+
+void g2::send_nack(g1::packet* pack) {}
+
 void g2::incoming(g1::packet* pack) {
 	g2::subheader* sh = (g2::subheader*) pack->dataptr();
+	socket* rsock = get_socket(sh->recvport);
+
+	if (rsock == nullptr) {
+		g2::send_nack(pack);
+		g1::release(pack);
+		return;
+	}
+
+	switch (sh->type) {
+		case g2_frame_type::CONNECT: {
+			if (rsock->state != g2_socket_state::ACCEPTER) {
+				gxx::println("warn: connect to non accepter socket");
+			}
+
+			g2::socket* dsock = generate_dynsock();
+			dsock->state = g2_socket_state::CONNECTED;
+			g2::send_conect_answer(dsock);
+			rsock->accepthandler(dsock);
+			break; 
+		}
+		case g2_frame_type::CONNECT_ANSWER: break;
+		case g2_frame_type::DATA: break;
+	}
+	g1::release(pack);
 }
