@@ -60,6 +60,11 @@ void unknown_port(g1::packet* pack) {
 	g1::send(pack->addrptr(), pack->addrsize(), (char*)&h, sizeof(h), g1::QoS(1));
 }
 
+void add_to_messages_list(g2::socket* sock, g1::packet* pack, g2::subheader* sh) {
+	///@todo !!!!!!!Добавить в список сообщений в соответствии с порядковым номером.
+	sock->messages.move_back(*pack);
+}
+
 void g2::incoming(g1::packet* pack) {
 	g1::print(pack);
 
@@ -77,27 +82,44 @@ void g2::incoming(g1::packet* pack) {
 
 	switch( rsock->state ) {
 		case g2::g2_socket_state::WAIT_HANDSHAKE: {
+			gxx::println("trace: WAIT_HANDSHAKE");
 			if (sh->type == g2::g2_frame_type::HANDSHAKE) {
 				gxx::println("handshake event");
 	
 				rsock->raddr_ptr = (uint8_t*)strndup((const char*)pack->addrptr(), pack->addrsize());
 				rsock->raddr_len = pack->addrsize();
 				rsock->rport = sh->sendport;
-		
+
 				rsock->state = g2::g2_socket_state::BRIDGE;
 				if (rsock->handler) rsock->handler(rsock->privdata, g2::event_type::HANDSHAKE);
+			} else {
+				gxx::println("warn: received DATA frame in WAIT_HANDSHAKE state");
 			}
 			g1::release(pack);
 			return;
 		}
 
 		case g2::g2_socket_state::BRIDGE: {
-			if (pack->addrsize() == rsock->raddr_len && strcmp((const char*)pack->addrptr(), (const char*)rsock->raddr_ptr) == 0) {
-				gxx::println("datapackage");
+			gxx::println("trace: BRIDGE");
+			if (pack->addrsize() == rsock->raddr_len && strncmp((const char*)pack->addrptr(), (const char*)rsock->raddr_ptr, rsock->raddr_len) == 0) {
+				//gxx::println("datapackage");
+				//rsock->messages.move_back(pack);
+
+				//Добавить в список сообщений в соответствии с порядковым номером.
+				add_to_messages_list(rsock, pack, sh);
 
 				if (rsock->handler) rsock->handler(rsock->privdata, g2::event_type::NEWDATA);
+				return;
 			}
+			else {
+				gxx::println("warn: message to BRIDGE socket with wrong address");
+			}
+			g1::release(pack);
+			return;
 		}
+
+		default:
+			gxx::println("warn: unrecognized socket_state state");
 	}
 }
 

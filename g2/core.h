@@ -59,6 +59,8 @@ namespace g2 {
 		dlist_head lnk;
 		uint16_t port;
 
+		gxx::dlist<g1::packet, &g1::packet::lnk> messages;
+
 		uint8_t* raddr_ptr;
 		size_t   raddr_len; 
 
