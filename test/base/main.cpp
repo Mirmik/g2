@@ -4,19 +4,39 @@
 #include <g1/indexes.h>
 
 #include <g2/core.h>
+#include <g2/channel/spam.h>
+#include <g2/channel/test.h>
 
 #include <gxx/util/gaddr.h>
 
+#include <thread>
+#include <chrono>
+
 void g1_incoming(g1::packet* pack) {
-	gxx::println("g1_incoming");
+	switch(pack->header.type) {
+		case G1_G2TYPE: 
+			g2::incoming(pack);
+			break;
+		default:
+			g1::release(pack);
+			break;
+	}
 }
 
 int main() {
 	g1::incoming_handler = g1_incoming;
-	g1::create_udpgate(10009);
-	
-	auto raddr = gxx::gaddr(".12.109.173.108.206:10009");
-	g1::send(raddr.data(), raddr.size(), "Mirmik", 6, g1::QoS(2));
 
-	g1::spin();
+	auto spamch = g2::create_spam_channel(1);
+	auto testch = g2::create_test_channel(2);
+
+	std::string raddr = gxx::gaddr("");
+	g2::handshake(spamch, 2, raddr.data(), raddr.size(), g1::QoS(0));
+	g2::send(spamch, "HelloWorld", 10);
+
+	auto thr = new std::thread(g1::spin);
+
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+	gxx::println((int)spamch->state);
 }

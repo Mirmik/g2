@@ -28,6 +28,7 @@ application("target",
 
 		("g2"),		
 	],
+	libs = ["pthread"]
 )
 
 licant.ex("target")

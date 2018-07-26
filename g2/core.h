@@ -1,180 +1,70 @@
 #ifndef G2_CORE_H
 #define G2_CORE_H
 
-#include <gxx/io/iostorage.h>
 #include <g1/tower.h>
 #include <gxx/syslock.h>
-#include <gxx/refcontrol.h>
 
 namespace g2 {
-	extern gxx::syslock lock;
-
-	enum class g2_frame_type : uint8_t {
-		CONREQUEST = 2,
-		HANDSHAKE = 3,
-		DATA = 4,
-		NACK = 5,
-	};
-
-	enum class event_type : uint8_t {
-		HANDSHAKE,
-		NEWDATA,
-	};
-
-	enum class g2_socket_state : uint8_t {
-		NONE,
-		
-		ACCEPTER,
-		
+	enum class State {
 		WAIT_HANDSHAKE,
-		//CONNECTING,
-		BRIDGE,
+		CONNECTED,
+		DISCONNECTED,
+	};
 
-		//WINDSEER,
+	enum class Frame {
+		HANDSHAKE = 0,
+		DATA = 1,
+		REFUSE = 2,
+	};
+
+	struct channel {
+		dlist_head lnk;
+		uint16_t id;
+		uint16_t rid;
+		void * raddr_ptr;
+		size_t raddr_len; 
+		g1::QoS qos;
+		uint16_t ackquant;
+		uint16_t fid = 0;
+		State state;
+		virtual void incoming_packet(g1::packet* pack) = 0;
+		channel() { dlist_init(&lnk); }
+	};
+
+	struct sequence_channel : public channel {
+
 	};
 
 	struct subheader {
-		g2_frame_type type;
-		
-		uint8_t sendport;
-		uint8_t recvport;
-			
-		union {
-			struct {///< CONNECT
-			};
-
-			struct {///< CONNECT_ANSWER
-				uint8_t dyn_recvport;
-			};
-
-			struct {///< DATA
-				//uint8_t datasize;
-				uint16_t seqid;
-				char data[0];
-			};
-		};
+		uint16_t sid;
+		uint16_t rid;
+		uint16_t frame_id;	
+		Frame ftype;	
 	} G1_PACKED;
 
-	struct socket {
-		dlist_head lnk;
-		uint16_t port;
-
-		gxx::dlist<g1::packet, &g1::packet::lnk> messages;
-
-		uint8_t* raddr_ptr;
-		size_t   raddr_len; 
-
-		union {
-			struct { ///< linked
-				uint16_t rport;
-				uint16_t sendseq;
-				uint16_t readseq;
-				dlist_head unreaded;
-				void* privdata;
-				void (*handler) (void*, event_type);
-			};
-
-			struct { ///< accepter
-				void (*accepthandler) (socket*);
-			};
-		};
-			
-
-		g2_socket_state state = g2_socket_state::NONE;
-
-		//void send(char* data, size_t size);
-
-		uint8_t refs = 0;
-
-		void ref_get() {
-		}
-		
-		void ref_put() {
-			dlist_del(&lnk);
-			delete this;
-		}
-
-		void send_connect(uint8_t* addr, size_t alen, int servid); 
-	};
+	struct subheader_handshake {
+		g1::QoS qos;
+		uint16_t ackquant;
+	} G1_PACKED;
 
 	static inline subheader* get_subheader(g1::packet* pack) {
 		return (subheader*) pack->dataptr();
-	}/*
+	}
 
-	struct sequence_port : public abstract_port {
-		dlist_head lnk;
-		uint16_t portid;
-		
-		g1_so
+	static inline gxx::buffer get_datasect(g1::packet* pack) {
+		return gxx::buffer(pack->dataptr() + sizeof(subheader), pack->datasize() - sizeof(subheader));
+	}	
 
-		gxx::dlist<g1::packet, &g1::packet::lnk> msgs;
-	
-		void incoming(g1::packet* pack) {
+	g2::channel* get_channel(uint16_t id);
 
-		}
-		
-		void(*newdatahandler)(void*);
-		void* newdatahandler_argument;		
-	};*/
+	extern gxx::dlist<g2::channel, &g2::channel::lnk> channels;
 
-	/*struct windseer_port {
-		void incomming(g1::packet* pack) override {
-			auto sh = get_subheader(pack);
-			if (sh->type != g2_frame_type::DATA) {
-				g1::realise(pack);
-			}
-
-			msgs->move_back(*pack);
-			newdatahandler(newdatahandler_argument);
-		}
-	};*/
-
-	/*struct server {
-		dlist_head servlnk;
-		uint16_t servport;
-
-		gxx::dlist<socket, &socket::socklnk> sockets;
-
-		uint8_t refs = 0;
-
-		void ref_get() {
-		}
-		
-		void ref_put() {
-			dlist_del(&servlnk);
-			delete this;
-		}
-	};*/
-
-	struct socket_ref : public gxx::refcontrol<socket, &socket::refs> {
-		using refcontrol = gxx::refcontrol<socket, &socket::refs>;
-		socket_ref(g2::socket* sock) : refcontrol(sock) {}
-	};
-
-	/*struct server_ref : public gxx::refcontrol<server, &server::refs> {
-		using refcontrol = gxx::refcontrol<server, &server::refs>;
-		server_ref(g2::server* serv) : refcontrol(serv) {}
-	};*/
-
-	extern gxx::dlist<g2::socket, &g2::socket::lnk> sockets;
-	//extern gxx::dlist<g2::server, &g2::server::servlnk> servers;
-
+	/// Добавить сервис к ядру.
+	void link_channel(g2::channel* srvs, uint16_t id);
 	void incoming(g1::packet* pack);
-	void print(g1::packet* pack);
 
-	//socket_ref create_socket();
-	//socket_ref create_socket(int port);
-	g2::socket* create_socket(uint16_t port);
-
-	uint16_t get_dynamic_id();
-	socket* get_socket(uint16_t port);
-
-	void send_nack(g1::packet* pack);
-	void send_handshake(g2::socket* sock, const char* addr, uint8_t alen, uint16_t port);
-
-	int send(g2::socket* sock, const char* data, size_t size);
-
-	void set_handler(g2::socket* sock, void(*handler)(void*, g2::event_type), void* privdata = nullptr);
+	void handshake(g2::channel* ch, uint16_t rid, const void* raddr_ptr, size_t raddr_len, g1::QoS qos = g1::QoS(0), uint16_t ackquant = 200);	
+	void send(g2::channel* ch, const char* data, size_t size);
 };
 
 #endif
