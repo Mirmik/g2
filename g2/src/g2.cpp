@@ -9,7 +9,9 @@ void g2::link_channel(g2::channel* ch, uint16_t id) {
 }
 
 g2::channel* g2::get_channel(uint16_t id) {
-	for (auto& ch : g2::channels) if (ch.id == id) return &ch;
+	for (auto& ch : g2::channels) {;
+		if (ch.id == id) return &ch;
+	}
 	return nullptr;
 }
 
@@ -32,6 +34,9 @@ void g2::incoming(g1::packet* pack) {
 	g2::subheader* sh = g2::get_subheader(pack);
 	g2::channel* ch = get_channel(sh->rid);
 
+	gxx::fprintln("g2 subheader: sid={}, rid={}", (uint16_t)sh->sid, (uint16_t)sh->rid);
+	dprhex(ch);
+
 	if (ch == nullptr) {
 		gxx::println("warn: packet to unrecognized port");
 		unknown_port(pack);
@@ -42,10 +47,25 @@ void g2::incoming(g1::packet* pack) {
 	switch(sh->ftype) {
 		case g2::Frame::HANDSHAKE:
 			gxx::println("HANDSHAKE");
+			if (ch->state == g2::State::INIT) {
+				g2::subheader_handshake* shh = g2::get_subheader_handshake(pack);
+				ch->rid = sh->sid;
+				ch->qos = shh->qos;
+				ch->ackquant = shh->ackquant;
+				ch->raddr_ptr = malloc(pack->header.alen);
+				memcpy(ch->raddr_ptr, pack->addrptr(), pack->header.alen);
+				ch->raddr_len = pack->header.alen;
+				ch->state = g2::State::CONNECTED;
+
+			}
+			else {
+				unknown_port(pack);
+			}
 			break;
 		case g2::Frame::DATA:
 			gxx::println("DATA");
 			ch->incoming_packet(pack);
+			gxx::println("OUT_DATA");
 			return;
 		case g2::Frame::REFUSE:
 			gxx::println("REFUSE");
@@ -111,7 +131,10 @@ void g2::handshake(g2::channel* ch, uint16_t rid, const void* raddr_ptr, size_t 
 	sh.frame_id = 0;
 	sh.ftype = g2::Frame::HANDSHAKE;
 
-	ch->raddr_ptr = strndup((const char*)raddr_ptr, raddr_len);
+	ch->raddr_ptr = malloc(raddr_len);
+	memcpy(ch->raddr_ptr, raddr_ptr, raddr_len);
+	dprhexln(ch->raddr_ptr);
+	dprln("arrrr");
 	ch->raddr_len = raddr_len;
 
 	shh.qos = qos;
@@ -137,6 +160,5 @@ void g2::send(g2::channel* ch, const char* data, size_t size) {
 		{&sh, sizeof(sh)},
 		{data, size},
 	};
-
 	g1::send(ch->raddr_ptr, ch->raddr_len, vec, sizeof(vec) / sizeof(gxx::iovec), G1_G2TYPE, ch->qos, ch->ackquant);
 }

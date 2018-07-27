@@ -6,6 +6,7 @@
 #include <g2/core.h>
 #include <g2/channel/spam.h>
 #include <g2/channel/test.h>
+#include <g2/channel/echo.h>
 
 #include <gxx/util/gaddr.h>
 
@@ -26,12 +27,12 @@ void g1_incoming(g1::packet* pack) {
 int main() {
 	g1::incoming_handler = g1_incoming;
 
-	auto spamch = g2::create_spam_channel(1);
-	auto testch = g2::create_test_channel(2);
+	auto spamch = g2::create_test_channel(1);
+	auto testch = g2::create_echo_channel(2);
 
 	std::string raddr = gxx::gaddr("");
 	g2::handshake(spamch, 2, raddr.data(), raddr.size(), g1::QoS(0));
-	g2::send(spamch, "HelloWorld", 10);
+	spamch->send("HelloWorld", 10);
 
 	auto thr = new std::thread(g1::spin);
 

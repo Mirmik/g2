@@ -6,7 +6,7 @@
 
 namespace g2 {
 	enum class State {
-		WAIT_HANDSHAKE,
+		INIT,
 		CONNECTED,
 		DISCONNECTED,
 	};
@@ -26,7 +26,7 @@ namespace g2 {
 		g1::QoS qos;
 		uint16_t ackquant;
 		uint16_t fid = 0;
-		State state;
+		State state = State::INIT;
 		virtual void incoming_packet(g1::packet* pack) = 0;
 		channel() { dlist_init(&lnk); }
 	};
@@ -49,6 +49,10 @@ namespace g2 {
 
 	static inline subheader* get_subheader(g1::packet* pack) {
 		return (subheader*) pack->dataptr();
+	}
+	
+	static inline subheader_handshake* get_subheader_handshake(g1::packet* pack) {
+		return (subheader_handshake*) (pack->dataptr() + sizeof(subheader));
 	}
 
 	static inline gxx::buffer get_datasect(g1::packet* pack) {

@@ -1,53 +1,38 @@
 #include <gxx/print.h>
 #include <g1/tower.h>
+#include <g1/gates/udpgate.h>
 #include <g1/indexes.h>
 
 #include <g2/core.h>
+#include <g2/channel/spam.h>
+#include <g2/channel/test.h>
+#include <g2/channel/echo.h>
+
+#include <gxx/util/gaddr.h>
+
+#include <thread>
+#include <chrono>
 
 void g1_incoming(g1::packet* pack) {
-	gxx::println("g1_incoming");
-	if (pack->header.type = G1_G2TYPE) {
-		g2::incoming(pack);
-	}
-	else {
-		g1::release(pack);
-	}
-}
-
-void ssock_handler(void* privdata, g2::event_type etype) {
-	switch(etype) {
-		case g2::event_type::HANDSHAKE:
-			gxx::println("HANDSHAKE event");
+	switch(pack->header.type) {
+		case G1_G2TYPE: 
+			g2::incoming(pack);
 			break;
-
-		case g2::event_type::NEWDATA:
-			gxx::println("NEWDATA event");
-			gxx::println(((g2::socket*)privdata)->messages.size());
+		default:
+			g1::release(pack);
 			break;
 	}
 }
 
-void msock_handler(void* privdata, g2::event_type etype) {
-	gxx::println("msock_handler");
+void trav(g1::packet* pack) {
+	gxx::print("traveling: "); g1::println(pack);
 }
 
 int main() {
+	g1::traveling_handler = trav;
+	g1::create_udpgate(10009);
+
 	g1::incoming_handler = g1_incoming;
-
-	auto ssock = g2::create_socket(10);
-	auto msock = g2::create_socket(11);
-
-	g2::set_handler(ssock, ssock_handler, ssock);
-	g2::set_handler(msock, msock_handler, msock);
-
-	ssock->state = g2::g2_socket_state::WAIT_HANDSHAKE;
-
-	int rport = 10;
-	g2::send_handshake(msock, "", 0, rport);
-	g2::send(msock, "HelloWorld0", 10);
-	g2::send(msock, "HelloWorld1", 10);
-	g2::send(msock, "HelloWorld2", 10);
-	g2::send(msock, "HelloWorld3", 10);
-
+	auto testch = g2::create_echo_channel(2);
 	g1::spin();
 }
