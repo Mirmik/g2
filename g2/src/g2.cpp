@@ -1,20 +1,20 @@
 #include <g2/core.h>
 #include <gxx/datastruct/iovec.h>
 
-gxx::dlist<g2::channel, &g2::channel::lnk> g2::channels;
-
+/*gxx::dlist<g2::channel, &g2::channel::lnk> g2::channels;
+*/
 void g2::link_channel(g2::channel* ch, uint16_t id) {
 	ch->id = id;
-	g2::channels.move_back(*ch);
+	g0::services.move_back(*ch);
 }
-
+/*
 g2::channel* g2::get_channel(uint16_t id) {
 	for (auto& ch : g2::channels) {;
 		if (ch.id == id) return &ch;
 	}
 	return nullptr;
-}
-
+}*/
+/*
 void unknown_port(g1::packet* pack) {
 	g2::subheader* rsh = g2::get_subheader(pack);
 	g2::subheader sh;
@@ -26,8 +26,8 @@ void unknown_port(g1::packet* pack) {
 
 	g1::send(pack->addrptr(), pack->addrsize(), (const char*)&sh, sizeof(g2::subheader), G1_G2TYPE, g1::QoS(2), pack->header.ackquant);
 }
-
-void g2::incoming(g1::packet* pack) {
+*/
+/*void g2::incoming(g1::packet* pack) {
 	gxx::println("g2::incomming");
 	g1::println(pack);
 
@@ -74,7 +74,7 @@ void g2::incoming(g1::packet* pack) {
 		default: break;
 	}
 	g1::release(pack);
-}
+}*/
 /*
 	gxx::fprintln("g2: incomming for socket {} from remote socket {}", rsock->port, sh->sendport);
 
@@ -122,14 +122,73 @@ void g2::incoming(g1::packet* pack) {
 */
 //}
 
+void g2::channel::incoming_packet(g1::packet* pack) {
+	g0::subheader* sh0 = g0::get_subheader(pack);
+	g2::subheader* sh2 = g2::get_subheader(pack);
+	
+	/*gxx::fprintln("g2 subheader: sid={}, rid={}", (uint16_t)sh->sid, (uint16_t)sh->rid);
+	dprhex(ch);
+
+	if (ch == nullptr) {
+		gxx::println("warn: packet to unrecognized port");
+		unknown_port(pack);
+		g1::release(pack);
+		return;
+	}*/
+
+	switch(sh2->ftype) {
+		case g2::Frame::HANDSHAKE:
+			gxx::println("HANDSHAKE");
+			if (state == g2::State::INIT) {
+				g2::subheader_handshake* shh = g2::get_subheader_handshake(pack);
+				rid = sh0->sid;
+				qos = shh->qos;
+				ackquant = shh->ackquant;
+				raddr_ptr = malloc(pack->header.alen);
+				memcpy(raddr_ptr, pack->addrptr(), pack->header.alen);
+				raddr_len = pack->header.alen;
+				state = g2::State::CONNECTED;
+
+			}
+			else {
+				gxx::panic("no INIT state");
+				//unknown_port(pack);
+			}
+			break;
+		case g2::Frame::DATA:
+			gxx::println("DATA");
+			//incoming_packet(pack);
+			gxx::println("OUT_DATA");
+			return;
+		case g2::Frame::REFUSE:
+			gxx::println("REFUSE");
+			state = g2::State::DISCONNECTED;
+			break;
+		default: break;
+	}
+	g1::release(pack);
+}
+
+void g2::acceptor::incoming_packet(g1::packet* pack) {
+	g0::subheader* sh0 = g0::get_subheader(pack);
+	g2::subheader* sh2 = g2::get_subheader(pack);
+	g2::subheader_handshake* shh = g2::get_subheader_handshake(pack);
+
+	auto ch = init_channel();
+
+	g2::handshake(ch, sh0->sid, pack->addrptr(), pack->addrsize(), shh->qos, shh->ackquant);
+	g1::release(pack);
+}
+
 void g2::handshake(g2::channel* ch, uint16_t rid, const void* raddr_ptr, size_t raddr_len, g1::QoS qos, uint16_t ackquant) {
-	g2::subheader sh;
+	g0::subheader sh0;
+	g2::subheader sh2;
 	g2::subheader_handshake shh;
 
-	sh.sid = ch->id;
-	sh.rid = ch->rid = rid;
-	sh.frame_id = 0;
-	sh.ftype = g2::Frame::HANDSHAKE;
+	sh0.sid = ch->id;
+	sh0.rid = ch->rid = rid;
+	sh2.frame_id = 0;
+	sh2.ftype = g2::Frame::HANDSHAKE;
 
 	ch->raddr_ptr = malloc(raddr_len);
 	memcpy(ch->raddr_ptr, raddr_ptr, raddr_len);
@@ -137,11 +196,12 @@ void g2::handshake(g2::channel* ch, uint16_t rid, const void* raddr_ptr, size_t 
 	dprln("arrrr");
 	ch->raddr_len = raddr_len;
 
-	shh.qos = qos;
-	shh.ackquant = ackquant;
+	ch->qos = shh.qos = qos;
+	ch->ackquant = shh.ackquant = ackquant;
 
 	gxx::iovec vec[] = {
-		{&sh, sizeof(sh)},
+		{&sh0, sizeof(sh0)},
+		{&sh2, sizeof(sh2)},
 		{&shh, sizeof(shh)},
 	};
 
@@ -150,15 +210,21 @@ void g2::handshake(g2::channel* ch, uint16_t rid, const void* raddr_ptr, size_t 
 }
 
 void g2::send(g2::channel* ch, const char* data, size_t size) {
-	g2::subheader sh;
-	sh.sid = ch->id;
-	sh.rid = ch->rid;
-	sh.frame_id = ch->fid++;
-	sh.ftype = g2::Frame::DATA;	
+	g0::subheader sh0;
+	g2::subheader sh2;
+	sh0.sid = ch->id;
+	sh0.rid = ch->rid;
+	sh2.frame_id = ch->fid++;
+	sh2.ftype = g2::Frame::DATA;	
 
 	gxx::iovec vec[] = {
-		{&sh, sizeof(sh)},
+		{&sh0, sizeof(sh0)},
+		{&sh2, sizeof(sh2)},
 		{data, size},
 	};
 	g1::send(ch->raddr_ptr, ch->raddr_len, vec, sizeof(vec) / sizeof(gxx::iovec), G1_G2TYPE, ch->qos, ch->ackquant);
+}
+
+uint16_t g2::dynport() {
+	return 512;
 }

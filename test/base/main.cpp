@@ -4,8 +4,8 @@
 #include <g1/indexes.h>
 
 #include <g2/core.h>
-#include <g2/channel/spam.h>
-#include <g2/channel/test.h>
+//#include <g2/channel/spam.h>
+//#include <g2/channel/test.h>
 #include <g2/channel/echo.h>
 
 #include <gxx/util/gaddr.h>
@@ -15,8 +15,8 @@
 
 void g1_incoming(g1::packet* pack) {
 	switch(pack->header.type) {
-		case G1_G2TYPE: 
-			g2::incoming(pack);
+		case G1_G0TYPE: 
+			g0::incoming(pack);
 			break;
 		default:
 			g1::release(pack);
@@ -24,10 +24,16 @@ void g1_incoming(g1::packet* pack) {
 	}
 }
 
+g2::channel* accept_channel() {
+	return g2::create_echo_channel(g2::dynport());
+}
+
 int main() {
 	g1::incoming_handler = g1_incoming;
 
-	auto spamch = g2::create_test_channel(1);
+	auto acceptor = g2::create_acceptor(33, accept_channel);
+
+	/*auto spamch = g2::create_test_channel(1);
 	auto testch = g2::create_echo_channel(2);
 
 	std::string raddr = gxx::gaddr("");
@@ -39,5 +45,5 @@ int main() {
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-	gxx::println((int)spamch->state);
+	gxx::println((int)spamch->state);*/
 }
